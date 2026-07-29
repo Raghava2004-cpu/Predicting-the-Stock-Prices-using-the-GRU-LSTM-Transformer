@@ -1,35 +1,51 @@
-# Predicting-the-Stock-Prices-using-the-GRU-Neural-networks
-This project uses a Gated Recurrent Unit (GRU) neural network in PyTorch to predict stock prices, leveraging historical data from yfinance. It supports historical price prediction, recursive future forecasting (e.g., for June 2025), 
+# Predicting-the-Stock-Prices-using-the - GRU_LSTM_Transformer
+
+## Benchmark results — AAPL (2015-01-01 to 2025-01-01)
+
+| Model | RMSE | MAE | MAPE (%) | Directional Accuracy (%) |
+|---|---|---|---|---|
+| Naive persistence | 2.67 | 1.96 | 1.00 | 0.27 |
+| Linear Regression | 2.84 | 2.12 | 1.08 | **52.66** |
+| LSTM | 7.03 | 5.00 | 2.35 | 44.95 |
+| GRU | 7.04 | 5.27 | 2.50 | 46.54 |
+| Transformer | 9.49 | 7.41 | 3.51 | 43.35 |
 
 
+<img width="2100" height="900" alt="predictions_vs_actual" src="https://github.com/user-attachments/assets/4e768ae0-e7c0-4930-9e2a-0272134bb72f" />
+<img width="1500" height="750" alt="training_curves" src="https://github.com/user-attachments/assets/4dc8a4ba-2084-4382-b37f-d18e5c7acf30" />
 
-## Features
-- **Historical Prediction**: Trains a GRU model to predict stock prices on historical data (e.g., AAPL from 2015 to 2025).
-- **Future Forecasting**: Recursively predicts future prices (e.g., May 30, 2025) using the last 60 days of data.
-- **Data Processing**: Fetches real-time stock data with yfinance, normalizes with MinMaxScaler, and creates sequences for time-series modeling.
-- **Evaluation**: Computes MSE, RMSE, and MAE to assess model performance, with visualizations of actual vs. predicted prices.
-- **Efficient Training**: Uses DataLoader with batch size of 32 to handle large datasets (~2553 sequences).
 
-## Technologies
-- **Python 3.8+**
-- **PyTorch**: For building and training the GRU model.
-- **yfinance**: For fetching stock price data.
-- **NumPy, Pandas**: For data manipulation.
-- **Scikit-learn**: For MinMaxScaler normalization.
-- **Matplotlib**: For plotting predictions.
+### Reading these results honestly
 
-## Installation
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/Raghava2004-cpu/Predicting-the-Stock-Prices-using-the-GRU-Neura-networks.git
-   cd Predicting-the-Stock-Prices-using-the-GRU-Neura-networks-gru
-   
-2. Install Requirements
-   ```bash
-      pip install -r requirements.txt
+The baselines beat every deep model here, on every error metric. Naive persistence
+(predict "no change") gets the lowest RMSE/MAE/MAPE by construction — daily closing
+prices are close to a random walk, so guessing "tomorrow = today" is a genuinely hard
+benchmark to beat. Linear regression is the strongest model overall and the only one
+above 50% directional accuracy.
 
-![Screenshot 2025-05-15 125902](https://github.com/user-attachments/assets/8cb96520-d45a-47b3-ac72-98faa652b7fb)
-![Screenshot 2025-05-15 125946](https://github.com/user-attachments/assets/e5f4c491-ea96-42de-ae3d-99039b43f5cd)
-![Screenshot 2025-05-15 125956](https://github.com/user-attachments/assets/7b416e92-2e63-4130-9ddd-d06fc00ec510)
+The GRU, LSTM, and Transformer all underperform both baselines, and score *below*
+50% directional accuracy — worse than chance at calling the next day's direction. The
+predictions plot shows why: all three visibly lag the actual price rather than
+tracking it, with LSTM lagging worst. This is a well-documented failure mode for
+recurrent/attention models on raw daily OHLCV — with only ~1,180 training rows and a
+noisy, near-random-walk target, these architectures have more capacity than the
+signal in the data supports, and they partially collapse toward smoothed
+autocorrelation with the recent price rather than learning real predictive structure.
+
+**Takeaway:** on this ticker/date range/feature set, model complexity did not help
+prediction accuracy — a useful, common, and legitimate finding. It also points at the
+main lever for improvement: more data, more regularization, or better features/labels
+(e.g. predicting returns instead of price, or a longer prediction horizon) rather than
+a bigger model.
+
+### Next steps to close the gap
+- Predict **returns** rather than raw price (removes most of the "just copy the last
+  value" trivial signal that inflates naive/linear baselines).
+- Regularize the deep models more (weight decay, dropout tuning) and/or shrink
+  hidden size — they may simply be overparameterized for ~1,180 training rows.
+- Multiple seeds per model, reported as mean ± std, since a single run this close to
+  the baselines isn't enough to rule out noise.
+- Walk-forward validation across several time windows and tickers instead of one
+  static split.
 
 
